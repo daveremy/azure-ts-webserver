@@ -1,0 +1,5 @@
+config:
+  azure-test:location: West US 2
+  azure-test:password: 2#Passme#2
+  azure-test:username: fredjones
+  azure:environment: public
