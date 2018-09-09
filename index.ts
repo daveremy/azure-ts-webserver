@@ -25,7 +25,7 @@ const subnet = new azure.network.Subnet(shortName + "-subnet", {
     addressPrefix: "10.0.2.0/24",
 });
 
-const publicIPResource = new azure.network.PublicIp(shortName + "-ip", {
+const publicIP = new azure.network.PublicIp(shortName + "-ip", {
     resourceGroupName: resourceGroup.name,
     location: resourceGroup.location,
     publicIpAddressAllocation: "Dynamic",
@@ -38,7 +38,7 @@ const networkInterface = new azure.network.NetworkInterface(shortName + "-nic", 
         name: "webserveripcfg",
         subnetId: subnet.id,
         privateIpAddressAllocation: "Dynamic",
-        publicIpAddressId: publicIPResource.id,
+        publicIpAddressId: publicIP.id,
     }],
 });
 // end network setup -----------------------------------------------------------
@@ -77,10 +77,14 @@ const vm = new azure.compute.VirtualMachine(shortName + "-vm", {
     },
 });
 
-export const publicIP = pulumi.all([vm.name, publicIPResource.name]).apply(async ([v, i]) => {
-    const ipResource = await azure.network.getPublicIP({
-        name: i,
-        resourceGroupName: v,
-    });
-    return ipResource.ipAddress;
-});
+// With azure the IP address is not available until the vm is created so use
+//  pulumi.all to wait for both the vm to be created (see vm.id below) and the
+//  public IP resource to be created.  The function passed to the apply method
+//  gets invoked in the post-update phase assuring the azure resources have
+//  been created.
+exports.publicIP = pulumi.all({ id: vm.id, name: publicIP.name, resourceGroupName: publicIP.resourceGroupName }).apply(ip =>
+    azure.network.getPublicIP({
+        name: ip.name,
+        resourceGroupName: ip.resourceGroupName,
+    }).then(ip => ip.ipAddress)
+);
